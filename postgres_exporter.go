@@ -217,7 +217,6 @@ var metricMaps = map[string]map[string]ColumnMapping{
 		"replay_location":          {DISCARD, "Last transaction log position replayed into the database on this standby server", nil},
 		"sync_priority":            {DISCARD, "Priority of this standby server for being chosen as the synchronous standby", nil},
 		"sync_state":               {DISCARD, "Synchronous state of this standby server", nil},
-		"pg_current_xlog_location": {DISCARD, "pg_current_xlog_location", nil},
 		"pg_xlog_location_diff":    {GAUGE, "Lag in bytes between master and slave", nil},
 	},
 	"pg_stat_activity": map[string]ColumnMapping{
@@ -241,7 +240,10 @@ var queryOverrides = map[string]string{
       ON tmp.mode=tmp2.mode and pg_database.oid = tmp2.database ORDER BY 1`,
 
 	"pg_stat_replication": `
-        SELECT *, pg_current_xlog_location(), pg_xlog_location_diff(pg_current_xlog_location(), replay_location)::float FROM pg_stat_replication`,
+        SELECT *, pg_xlog_location_diff(
+		(SELECT CASE WHEN pg_last_xlog_receive_location() IS NOT NULL THEN pg_last_xlog_receive_location() ELSE pg_current_xlog_location() END),
+		replay_location
+	)::float FROM pg_stat_replication`,
 
 	"pg_stat_activity": `
       SELECT
