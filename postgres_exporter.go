@@ -241,7 +241,7 @@ var queryOverrides = map[string]string{
 
 	"pg_stat_replication": `
         SELECT *, pg_xlog_location_diff(
-		(SELECT CASE WHEN pg_last_xlog_receive_location() IS NOT NULL THEN pg_last_xlog_receive_location() ELSE pg_current_xlog_location() END),
+		(SELECT CASE WHEN pg_is_in_recovery() THEN pg_last_xlog_receive_location() ELSE pg_current_xlog_location() END),
 		replay_location
 	)::float FROM pg_stat_replication`,
 
