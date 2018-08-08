@@ -1,8 +1,10 @@
 [![Build Status](https://travis-ci.org/wrouesnel/postgres_exporter.svg?branch=master)](https://travis-ci.org/wrouesnel/postgres_exporter)
+[![Coverage Status](https://coveralls.io/repos/github/wrouesnel/postgres_exporter/badge.svg?branch=master)](https://coveralls.io/github/wrouesnel/postgres_exporter?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wrouesnel/postgres_exporter)](https://goreportcard.com/report/github.com/wrouesnel/postgres_exporter)
 
-# PostgresSQL Server Exporter
+# PostgreSQL Server Exporter
 
-Prometheus exporter for PostgresSQL server metrics.
+Prometheus exporter for PostgreSQL server metrics.
 Supported Postgres versions: 9.1 and up.
 
 ## Quick Start
@@ -11,22 +13,24 @@ This package is available for Docker:
 # Start an example database
 docker run --net=host -it --rm -e POSTGRES_PASSWORD=password postgres
 # Connect to it
-docker run -e DATA_SOURCE_NAME="postgresql://postgres:password@localhost:5432/?sslmode=disable" -p 9113:9113 wrouesnel/postgres_exporter
+docker run -e DATA_SOURCE_NAME="postgresql://postgres:password@localhost:5432/?sslmode=disable" -p 9187:9187 wrouesnel/postgres_exporter
 ```
 
 ## Building and running
 The default make file behavior is to build the binary:
 ```
+go get github.com/wrouesnel/postgres_exporter
+cd ${GOPATH-$HOME/go}/src/github.com/wrouesnel/postgres_exporter
 make
 export DATA_SOURCE_NAME="postgresql://login:password@hostname:port/dbname"
 ./postgres_exporter <flags>
 ```
 
-To build the dockerfile, run `make docker`. 
+To build the dockerfile, run `make docker`.
 
-This will build the docker image as `wrouesnel/postgres_exporter:latest`. This 
-is a minimal docker image containing *just* postgres_exporter. By default no SSL 
-certificates are included, if you need to use SSL you should either bind-mount 
+This will build the docker image as `wrouesnel/postgres_exporter:latest`. This
+is a minimal docker image containing *just* postgres_exporter. By default no SSL
+certificates are included, if you need to use SSL you should either bind-mount
 `/etc/ssl/certs/ca-certificates.crt` or derive a new image containing them.
 
 ### Vendoring
@@ -34,14 +38,39 @@ Package vendoring is handled with [`govendor`](https://github.com/kardianos/gove
 
 ### Flags
 
-Name               | Description
--------------------|------------
-web.listen-address | Address to listen on for web interface and telemetry.
-web.telemetry-path | Path under which to expose metrics.
+* `web.listen-address`
+  Address to listen on for web interface and telemetry.
+
+* `web.telemetry-path`
+  Path under which to expose metrics.
+
+### Environment Variables
+
+The following environment variables configure the exporter:
+
+* `DATA_SOURCE_NAME`
+  the default legacy format. Accepts URI form and key=value form arguments. The
+  URI may contain the username and password to connect with.
+
+* `DATA_SOURCE_URI`
+   an alternative to DATA_SOURCE_NAME which exclusively accepts the raw URI
+   without a username and password component.
+
+* `DATA_SOURCE_USER`
+  When using `DATA_SOURCE_URI`, this environment variable is used to specify
+  the username.
+* `DATA_SOURCE_USER_FILE`
+  The same, but reads the username from a file.
+
+* `DATA_SOURCE_PASS`
+  When using `DATA_SOURCE_URI`, this environment variable is used to specify
+  the password to connect with.
+* `DATA_SOURCE_PASS_FILE`
+  The same as above but reads the password from a file.
 
 ### Setting the Postgres server's data source name
 
-The PostgresSQL server's [data source name](http://en.wikipedia.org/wiki/Data_source_name)
+The PostgreSQL server's [data source name](http://en.wikipedia.org/wiki/Data_source_name)
 must be set via the `DATA_SOURCE_NAME` environment variable.
 
 For running it locally on a default Debian/Ubuntu install, this will work (transpose to init script as appropriate):
@@ -72,38 +101,38 @@ Some examples are provided in [queries.yaml](queries.yaml).
 
 ### Running as non-superuser
 
-To be able to collect metrics from pg_stat_activity and pg_stat_replication as non-superuser you have to create functions and views to do so.
+To be able to collect metrics from pg_stat_activity and pg_stat_replication as non-superuser you have to create views as a superuser, and assign permissions separately to those.  In PostgreSQL, views run with the permissions of the user that created them so they can act as security barriers.
 
 ```sql
 CREATE USER postgres_exporter PASSWORD 'password';
 ALTER USER postgres_exporter SET SEARCH_PATH TO postgres_exporter,pg_catalog;
 
+-- If deploying as non-superuser (for example in AWS RDS)
+-- GRANT postgres_exporter TO :MASTER_USER;
 CREATE SCHEMA postgres_exporter AUTHORIZATION postgres_exporter;
-
-CREATE FUNCTION postgres_exporter.f_select_pg_stat_activity()
-RETURNS setof pg_catalog.pg_stat_activity
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
-  SELECT * from pg_catalog.pg_stat_activity;
-$$;
-
-CREATE FUNCTION postgres_exporter.f_select_pg_stat_replication()
-RETURNS setof pg_catalog.pg_stat_replication
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
-  SELECT * from pg_catalog.pg_stat_replication;
-$$;
-
-CREATE VIEW postgres_exporter.pg_stat_replication
-AS
-  SELECT * FROM postgres_exporter.f_select_pg_stat_replication();
 
 CREATE VIEW postgres_exporter.pg_stat_activity
 AS
-  SELECT * FROM postgres_exporter.f_select_pg_stat_activity();
+  SELECT * from pg_catalog.pg_stat_activity;
+
+GRANT SELECT ON postgres_exporter.pg_stat_activity TO postgres_exporter;
+
+CREATE VIEW postgres_exporter.pg_stat_replication AS
+  SELECT * from pg_catalog.pg_stat_replication;
 
 GRANT SELECT ON postgres_exporter.pg_stat_replication TO postgres_exporter;
-GRANT SELECT ON postgres_exporter.pg_stat_activity TO postgres_exporter;
 ```
+
+> **NOTE**
+> <br />Remember to use `postgres` database name in the connection string:
+> ```
+> DATA_SOURCE_NAME=postgresql://postgres_exporter:password@localhost:5432/postgres?sslmode=disable
+> ```
+
+# Hacking
+
+* The build system is currently only supported for Linux-like platforms. It
+  depends on GNU Make.
+* To build a copy for your current architecture run `make binary` or just `make`
+  This will create a symlink to the just built binary in the root directory.
+* To build release tar balls run `make release`.

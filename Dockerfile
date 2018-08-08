@@ -1,7 +1,9 @@
 FROM scratch
 
-COPY postgres_exporter /postgres_exporter
+ARG binary
 
-EXPOSE 9113
+COPY $binary /postgres_exporter
+
+EXPOSE 9187
 
 ENTRYPOINT [ "/postgres_exporter" ]
