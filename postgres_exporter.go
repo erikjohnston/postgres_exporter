@@ -248,7 +248,7 @@ var builtinMetricMaps = map[string]map[string]ColumnMapping{
 		"xmin":                     {DISCARD, "The oldest transaction that this slot needs the database to retain. VACUUM cannot remove tuples deleted by any later transaction", nil, nil},
 		"catalog_xmin":             {DISCARD, "The oldest transaction affecting the system catalogs that this slot needs the database to retain. VACUUM cannot remove catalog tuples deleted by any later transaction", nil, nil},
 		"restart_lsn":              {DISCARD, "The address (LSN) of oldest WAL which still might be required by the consumer of this slot and thus won't be automatically removed during checkpoints", nil, nil},
-		"pg_current_xlog_location": {DISCARD, "pg_current_xlog_location", nil, nil},
+		"pg_current_xlog_location": {GAUGE, "pg_current_xlog_location", nil, nil},
 		"pg_current_wal_lsn":       {DISCARD, "pg_current_xlog_location", nil, semver.MustParseRange(">=10.0.0")},
 		"pg_xlog_location_diff":    {GAUGE, "Lag in bytes between master and slave", nil, semver.MustParseRange(">=9.2.0 <10.0.0")},
 		"pg_wal_lsn_diff":          {GAUGE, "Lag in bytes between master and slave", nil, semver.MustParseRange(">=10.0.0")},
@@ -315,7 +315,7 @@ var queryOverrides = map[string][]OverrideQuery{
 			semver.MustParseRange(">=9.2.0 <10.0.0"),
 			`
 			SELECT *,
-				(case pg_is_in_recovery() when 't' then null else pg_current_xlog_location() end) AS pg_current_xlog_location,
+				(case pg_is_in_recovery() when 't' then null else (pg_current_xlog_location()-pg_lsn('0/0'))::float end) AS pg_current_xlog_location,
 				(case pg_is_in_recovery() when 't' then null else pg_xlog_location_diff(pg_current_xlog_location(), replay_location)::float end) AS pg_xlog_location_diff
 			FROM pg_stat_replication
 			`,
